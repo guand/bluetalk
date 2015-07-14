@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import re
+import rsa
 
 import gtk
 import gobject
@@ -223,10 +224,56 @@ class BluezChatGui:
         self.server_sock.listen(1)
 
         gobject.io_add_watch(self.server_sock, gobject.IO_IN, self.incoming_connection)
+    
+    def read_public_key(self, address):
+        if not os.path.exists('keys/' + address + ".pem"):
+            #TODO: Make exception more specific
+            raise Exception("Could not find public key for address: " + address)
+        else:
+            keyfile = open('keys/' + address + '.pem')
+            key = keyfile.read()
+            keyfile.close()
+            return rsa.PublicKey.load_pkcs1(key)
+    
+    #takes public key in pem format, may change this in the future
+    def write_public_key(self, address, pemkey):
+        if os.path.exists('keys/' + address + '.pem'):
+            print "\nWarning: Overwriting previous public key for address " + address
+        keyfile = open('keys/' + address + ".pem", 'wb')
+        keyfile.write(pemkey)
+        keyfile.close()
+
+    def init_rsa(self):
+	self.add_text("\nloading RSA keypair...")
+        if os.path.exists('keys/private.pem'):
+            keyfile = open('keys/private.pem')
+            keypair = keyfile.read()
+            self.pubkey = rsa.PublicKey.load_pkcs1(keypair)
+            self.privkey = rsa.PrivateKey.load_pkcs1(keypair) 
+	    keyfile.close()
+            self.add_text(" done")
+        else:
+            self.add_text(" not found\ngenerating new keypair...")
+            keypair = rsa.newkeys(1024)
+            self.pubkey = keypair[0]
+            self.privkey = keypair[1]
+            keyfile = open('keys/private.pem', 'wb')
+            keyfile.write(rsa.PublicKey.save_pkcs1(self.pubkey, 'PEM'))
+            keyfile.write(rsa.PrivateKey.save_pkcs1(self.privkey, 'PEM'))
+            keyfile.close()
+            self.add_text(" done")
+
+    def encrypt_for_addr(self, content, address):
+        pkey = self.read_public_key(address)
+        return rsa.encrypt(content, pkey)
+
+    def decrypt_content(self, content):
+        return rsa.decrypt(content, self.privkey)
 
     def run(self):
         self.text_buffer.insert(self.text_buffer.get_end_iter(), "loading...")
         self.start_server()
+	self.init_rsa()
         gtk.main()
 
 if __name__ == "__main__":
