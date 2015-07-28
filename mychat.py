@@ -119,7 +119,8 @@ class BluezChatGui:
         self.scan_button.set_sensitive(True)
         self.chat_button.set_sensitive(False)
         
-
+        ## Scans for devices, connects to them, and adds input text to msg dict. 
+        ## serializes the msg and then sends it over the socket.
     def send_button_clicked(self, widget):
         self.scan_button_clicked(widget)
         self.peers.clear()
@@ -142,6 +143,8 @@ class BluezChatGui:
         self.add_text("\nme - %s" % text)
 
 
+    ## gets info from app screen and sets that info to corresponding fields in msg dictionary.
+    ## I included the RSA flag and checksum fields but don't know what they are for
 
     def chat_button_clicked(self, widget):
         (model, iter) = self.devices_tv.get_selection().get_selected()
@@ -194,6 +197,9 @@ class BluezChatGui:
         #self.sources[address] = source
         return True
 
+
+    ## When data is ready on the socket, recv from socket
+    ## if no data in msg received, cancel connection (this isn't really relevant to us)
     def data_ready(self, sock, condition):
         address = self.addresses[sock]
         data = sock.recv(1024)
@@ -205,11 +211,25 @@ class BluezChatGui:
             del self.peers[address]
             del self.addresses[sock]
             sock.close()
+
+        ## If there is data read, deserialize from json and check if DST (destination) matches localaddr
+        ## If so, print to screen, else decrement remaining hops, scan, and send out to all discovered devices  
         else:
             decoded = json.loads(data)
             if decoded['DST'] == self.localaddr:
                 self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
-        return True
+            else if decoded['hops_remaining'] > 0:
+                decoded['hops_remaining'] -=1;
+                self.scan_button_clicked(widget)
+                self.peers.clear()
+                re_serialized = json.dumps(decoded)
+                for addr, name in self.discovered:
+                    if addr !in decoded['hop_list']:
+                        self.connect(addr)
+                        for addr, sock in list(self.peers.items()):
+                            sock.send(re_serialized)
+
+                return True
 
 # --- other stuff
 
@@ -235,9 +255,9 @@ class BluezChatGui:
         self.text_buffer.insert(self.text_buffer.get_end_iter(), text)
 
     def start_server(self):
-        john = "brennans_bluetalk"
-        call(["sudo", "hciconfig", "hci0", "name", john])
-        #call(["sudo", "service", "bluetooth", "restart"])
+        ## newname should reflect local bluetooth name + 'bluetalk'
+        newname = "brennans_bluetalk"
+        call(["sudo", "hciconfig", "hci0", "name", newname])
         self.server_sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
         self.server_sock.bind(("",0x1001))
         self.server_sock.listen(1)
@@ -251,4 +271,3 @@ class BluezChatGui:
 if __name__ == "__main__":
     gui = BluezChatGui()
     gui.run()
-                                                                                                                                                                                                                                                                                                                                                                                            
