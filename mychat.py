@@ -13,11 +13,12 @@ import os
 import sys
 import time
 import re
-import rsa
-
+import pickle
 import gtk
+import json
 import gobject
 import gtk.glade
+from subprocess import call
 
 import bluetooth
 
@@ -30,6 +31,15 @@ def alert(text, buttons=gtk.BUTTONS_NONE, type=gtk.MESSAGE_INFO):
     md.label.set_text(text)
     md.run()
     md.destroy()
+
+class header:
+    def __init__(self, SRC, DST, flag, checksum, hops_remaining, hop_list):
+            self.SRC = SRC
+            self.DST = DST
+            self.flag = flag
+            self.checksum = checksum
+            self.hops_remaining = hops_remaining
+            self.hop_list = hop_list
 
 class BluezChatGui:
     def __init__(self):
@@ -77,6 +87,8 @@ class BluezChatGui:
         self.chat_button.set_sensitive(False)
 
         self.peers = {}
+
+        self.nearby = {}
         self.sources = {}
         self.addresses = {}
 
@@ -109,15 +121,22 @@ class BluezChatGui:
         
 
     def send_button_clicked(self, widget):
-        text = ""
-        text += self.localaddr
-        text += self.input_tb.get_text()
-        sendtext = ''
+        self.scan_button_clicked(widget)
+        self.peers.clear()
+        for addr, name in self.discovered:
+            self.connect(addr)
+
+ 
+        ## do RSA stuff (obviously not implemented)
+        text = self.input_tb.get_text()
+
         if len(text) == 0: return
 
+        self.msg.update({'msg': text})
+        serialized_text = json.dumps(self.msg)
+
         for addr, sock in list(self.peers.items()):
-            text += ("\n%s\n" % self.currentaddr)
-            sock.send(text)
+            sock.send(serialized_text)
 
         self.input_tb.set_text("")
         self.add_text("\nme - %s" % text)
@@ -129,6 +148,9 @@ class BluezChatGui:
         if iter is not None:
             addr = model.get_value(iter, 0)
             name = model.get_value(iter, 1)
+            self.msg = {'SRC': self.localaddr, 'DST': addr, 'Flag': '1', 'Checksum': '10', 'hops_remaining': 10, 'hop_list': []}
+
+
 
 
 
@@ -157,11 +179,6 @@ class BluezChatGui:
 
 # --- network events
 
-    def send_message(self,dest):
-
-        for addr, name in bluetooth.discover_devices (lookup_names = True):
-            self.add_text("\nalmost")
-
 
     def incoming_connection(self, source, condition):
         sock, info = self.server_sock.accept()
@@ -170,11 +187,11 @@ class BluezChatGui:
         self.add_text("\naccepted connection from %s" % str(address))
 
         # add new connection to list of peers
-        self.peers[address] = sock
+        # self.peers[address] = sock
         self.addresses[sock] = address
 
         source = gobject.io_add_watch (sock, gobject.IO_IN, self.data_ready)
-        self.sources[address] = source
+        #self.sources[address] = source
         return True
 
     def data_ready(self, sock, condition):
@@ -189,10 +206,9 @@ class BluezChatGui:
             del self.addresses[sock]
             sock.close()
         else:
-            matchObj = re.search(r'(self.localaddr)', data, flags=0)
-            if matchObj:
-                self.add_text("YEAHY\n")
-            self.add_text("\n%s - %s" % (address, str(data)))
+            decoded = json.loads(data)
+            if decoded['DST'] == self.localaddr:
+                self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
         return True
 
 # --- other stuff
@@ -207,7 +223,7 @@ class BluezChatGui:
         except bluetooth.BluetoothError as e:
             self.add_text("\n%s" % str(e))
             sock.close()
-            return
+            return 
 
         self.peers[addr] = sock
         source = gobject.io_add_watch (sock, gobject.IO_IN, self.data_ready)
@@ -219,61 +235,17 @@ class BluezChatGui:
         self.text_buffer.insert(self.text_buffer.get_end_iter(), text)
 
     def start_server(self):
+        john = "brennans_bluetalk"
+        call(["sudo", "hciconfig", "hci0", "name", john])
+        #call(["sudo", "service", "bluetooth", "restart"])
         self.server_sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
         self.server_sock.bind(("",0x1001))
         self.server_sock.listen(1)
-
         gobject.io_add_watch(self.server_sock, gobject.IO_IN, self.incoming_connection)
-    
-    def read_public_key(self, address):
-        if not os.path.exists('keys/' + address + ".pem"):
-            #TODO: Make exception more specific
-            raise Exception("Could not find public key for address: " + address)
-        else:
-            keyfile = open('keys/' + address + '.pem')
-            key = keyfile.read()
-            keyfile.close()
-            return rsa.PublicKey.load_pkcs1(key)
-    
-    #takes public key in pem format, may change this in the future
-    def write_public_key(self, address, pemkey):
-        if os.path.exists('keys/' + address + '.pem'):
-            print "\nWarning: Overwriting previous public key for address " + address
-        keyfile = open('keys/' + address + ".pem", 'wb')
-        keyfile.write(pemkey)
-        keyfile.close()
-
-    def init_rsa(self):
-	self.add_text("\nloading RSA keypair...")
-        if os.path.exists('keys/private.pem'):
-            keyfile = open('keys/private.pem')
-            keypair = keyfile.read()
-            self.pubkey = rsa.PublicKey.load_pkcs1(keypair)
-            self.privkey = rsa.PrivateKey.load_pkcs1(keypair) 
-	    keyfile.close()
-            self.add_text(" done")
-        else:
-            self.add_text(" not found\ngenerating new keypair...")
-            keypair = rsa.newkeys(1024)
-            self.pubkey = keypair[0]
-            self.privkey = keypair[1]
-            keyfile = open('keys/private.pem', 'wb')
-            keyfile.write(rsa.PublicKey.save_pkcs1(self.pubkey, 'PEM'))
-            keyfile.write(rsa.PrivateKey.save_pkcs1(self.privkey, 'PEM'))
-            keyfile.close()
-            self.add_text(" done")
-
-    def encrypt_for_addr(self, content, address):
-        pkey = self.read_public_key(address)
-        return rsa.encrypt(content, pkey)
-
-    def decrypt_content(self, content):
-        return rsa.decrypt(content, self.privkey)
 
     def run(self):
         self.text_buffer.insert(self.text_buffer.get_end_iter(), "loading...")
         self.start_server()
-	self.init_rsa()
         gtk.main()
 
 if __name__ == "__main__":
