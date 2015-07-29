@@ -218,9 +218,11 @@ class BluezChatGui:
         else:
             decoded = json.loads(data)
             if decoded['DST'] == self.localaddr:
+		self.add_text("\nReceived message destined for me")
                 self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
             elif decoded['hops_remaining'] > 0:
                 print "Hops left on msg with DST:\n", decoded[hops_remaining]
+		self.add_text("\nPassing along message for %s" % (str(decoded[DST])))
                 decoded['hops_remaining'] -=1;
                 self.scan_button_clicked(widget)
                 self.peers.clear()
