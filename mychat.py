@@ -201,7 +201,7 @@ class BluezChatGui:
 
     ## When data is ready on the socket, recv from socket
     ## if no data in msg received, cancel connection (this isn't really relevant to us)
-    def data_ready(self, sock, condition, widget):
+    def data_ready(self, sock, condition):
         address = self.addresses[sock]
         data = sock.recv(1024)
 
@@ -224,7 +224,7 @@ class BluezChatGui:
                 print "Hops left on msg with DST:\n", decoded['hops_remaining']
 		self.add_text("\nPassing along message for %s" % (str(decoded['DST'])))
                 decoded['hops_remaining'] -=1;
-                self.scan_button_clicked(widget)
+                self.scan_button_clicked(0)
                 self.peers.clear()
                 re_serialized = json.dumps(decoded)
                 for addr, name in self.discovered:
