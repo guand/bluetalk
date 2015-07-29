@@ -201,7 +201,7 @@ class BluezChatGui:
 
     ## When data is ready on the socket, recv from socket
     ## if no data in msg received, cancel connection (this isn't really relevant to us)
-    def data_ready(self, sock, condition):
+    def data_ready(self, sock, condition, widget):
         address = self.addresses[sock]
         data = sock.recv(1024)
 
