@@ -18,7 +18,7 @@ import gtk
 import json
 import gobject
 import gtk.glade
-from subprocess import call
+import subprocess
 
 import bluetooth
 
@@ -119,7 +119,7 @@ class BluezChatGui:
         self.scan_button.set_sensitive(True)
         self.chat_button.set_sensitive(False)
         
-        ## Scans for devices, connects to them, and adds input text to msg dict. 
+        ## when send is clicked, Scans for devices, connects to them, and adds input text to msg dict. 
         ## serializes the msg and then sends it over the socket.
     def send_button_clicked(self, widget):
         self.scan_button_clicked(widget)
@@ -218,13 +218,13 @@ class BluezChatGui:
             decoded = json.loads(data)
             if decoded['DST'] == self.localaddr:
                 self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
-            else if decoded['hops_remaining'] > 0:
+            elif decoded['hops_remaining'] > 0:
                 decoded['hops_remaining'] -=1;
                 self.scan_button_clicked(widget)
                 self.peers.clear()
                 re_serialized = json.dumps(decoded)
                 for addr, name in self.discovered:
-                    if addr !in decoded['hop_list']:
+                    if addr not in decoded['hop_list']:
                         self.connect(addr)
                         for addr, sock in list(self.peers.items()):
                             sock.send(re_serialized)
@@ -257,7 +257,15 @@ class BluezChatGui:
     def start_server(self):
         ## newname should reflect local bluetooth name + 'bluetalk'
         newname = "brennans_bluetalk"
-        call(["sudo", "hciconfig", "hci0", "name", newname])
+        namereturn = subprocess.check_output(["sudo", "hciconfig", "hci0", "name"])
+        matchobj = re.search('((.{2}:){5}.{2})', namereturn)
+        matcher = re.search("Name: '(.{2,48})'", namereturn)
+        if matchobj:
+            self.localaddr = matchobj.group(1)
+            self.localname = matcher.group(1)
+
+
+        subprocess.call(["sudo", "hciconfig", "hci0", "name", newname])
         self.server_sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
         self.server_sock.bind(("",0x1001))
         self.server_sock.listen(1)
