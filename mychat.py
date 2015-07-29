@@ -98,6 +98,7 @@ class BluezChatGui:
 # --- gui signal handlers
 
     def quit_button_clicked(self, widget):
+        subprocess.call(["sudo", "hciconfig", "hci0", "name", self.localname])
         gtk.main_quit()
 
     def scan_button_clicked(self, widget):
@@ -125,7 +126,7 @@ class BluezChatGui:
         self.scan_button_clicked(widget)
         self.peers.clear()
         for addr, name in self.discovered:
-            self.connect(addr)
+            self.connect(addr, name)
 
  
         ## do RSA stuff (obviously not implemented)
@@ -164,7 +165,7 @@ class BluezChatGui:
             name = model.get_value(iter, 1)
             self.friends.append ((addr, name))
             self.add_text("\nPairing with %s..." % name)
-            self.connect(addr)
+            self.connect(addr, name)
             self.add_text("\nAdded %s to friend list.\n" % name)
 
     
@@ -219,13 +220,14 @@ class BluezChatGui:
             if decoded['DST'] == self.localaddr:
                 self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
             elif decoded['hops_remaining'] > 0:
+                print "Hops left on msg with DST:\n", decoded[hops_remaining]
                 decoded['hops_remaining'] -=1;
                 self.scan_button_clicked(widget)
                 self.peers.clear()
                 re_serialized = json.dumps(decoded)
                 for addr, name in self.discovered:
                     if addr not in decoded['hop_list']:
-                        self.connect(addr)
+                        self.connect(addr, name)
                         for addr, sock in list(self.peers.items()):
                             sock.send(re_serialized)
 
@@ -236,19 +238,20 @@ class BluezChatGui:
     def cleanup(self):
         self.hci_sock.close()
 
-    def connect(self, addr):
-        sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
-        try:
-            sock.connect((addr, 0x1001))
-        except bluetooth.BluetoothError as e:
-            self.add_text("\n%s" % str(e))
-            sock.close()
-            return 
+    def connect(self, addr, name):
+        if 'bluetalk' in name:
+            sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
+            try:
+                sock.connect((addr, 0x1001))
+            except bluetooth.BluetoothError as e:
+                self.add_text("\n%s" % str(e))
+                sock.close()
+                return 
 
-        self.peers[addr] = sock
-        source = gobject.io_add_watch (sock, gobject.IO_IN, self.data_ready)
-        self.sources[addr] = source
-        self.addresses[sock] = addr
+            self.peers[addr] = sock
+            source = gobject.io_add_watch (sock, gobject.IO_IN, self.data_ready)
+            self.sources[addr] = source
+            self.addresses[sock] = addr
 
 
     def add_text(self, text):
@@ -256,7 +259,7 @@ class BluezChatGui:
 
     def start_server(self):
         ## newname should reflect local bluetooth name + 'bluetalk'
-        newname = "brennans_bluetalk"
+
         namereturn = subprocess.check_output(["sudo", "hciconfig", "hci0", "name"])
         matchobj = re.search('((.{2}:){5}.{2})', namereturn)
         matcher = re.search("Name: '(.{2,48})'", namereturn)
@@ -264,7 +267,7 @@ class BluezChatGui:
             self.localaddr = matchobj.group(1)
             self.localname = matcher.group(1)
 
-
+        newname = self.localname + '_bluetalk'
         subprocess.call(["sudo", "hciconfig", "hci0", "name", newname])
         self.server_sock = bluetooth.BluetoothSocket (bluetooth.L2CAP)
         self.server_sock.bind(("",0x1001))
@@ -279,4 +282,3 @@ class BluezChatGui:
 if __name__ == "__main__":
     gui = BluezChatGui()
     gui.run()
-                                                                                                                                                                                                                                                                         
