@@ -112,7 +112,7 @@ class BluezChatGui:
         ## Scans for 3 seconds, can be adjusted.
      
         self.discovered.clear()
-        for addr, name in bluetooth.discover_devices (duration = 3, lookup_names = True):
+        for addr, name in bluetooth.discover_devices (duration = 5, lookup_names = True):
             self.discovered.append ((addr, name))
 
 
