@@ -145,11 +145,19 @@ class BluezChatGui:
             self.msg.update({'Flag': '1'}) 
 
         self.msg.update({'msg': text})
-        print self.msg
+        
+        new_recipients = []
+        for addr, sock in list(self.peers.items()):
+            if addr not in self.msg['hop_list']:
+                new_recipients.push(addr)
+
+        self.msg['hop_list'] += new_recipients
         serialized_text = json.dumps(self.msg)
 
-        for addr, sock in list(self.peers.items()):
-            sock.send(serialized_text)
+        #for addr, sock in list(self.peers.items()):
+        for addr in new_recipients:
+            self.peers[addr].send(serialized_text)
+            #sock.send(serialized_text)
 
         self.input_tb.set_text("")
         
