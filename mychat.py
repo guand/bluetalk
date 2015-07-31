@@ -239,7 +239,7 @@ class BluezChatGui:
             if decoded['DST'] == self.localaddr:
                 if(decoded['Flag'] == '2' or decoded['Flag'] == '3'): 
                     self.add_text("\nReceived friend request, exchanging keys")
-                    self.write_public_key(str(decoded['SRC'], str(decoded['msg'])))
+                    self.write_public_key(decoded['SRC'], decoded['msg'])
                     if(decoded['Flag'] == '2'):
                         self.send_rsa_key(decoded['SRC'], '3')
                 else:
