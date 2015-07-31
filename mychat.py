@@ -150,9 +150,9 @@ class BluezChatGui:
         new_recipients = []
         for addr, sock in list(self.peers.items()):
             if addr not in self.msg['hop_list']:
-                new_recipients.push(addr)
+                new_recipients.append(addr)
         if self.localaddr not in self.msg['hop_list']:
-            self.msg['hop_list'].push(self.localaddr)
+            self.msg['hop_list'].append(self.localaddr)
         self.msg['hop_list'] += new_recipients
         serialized_text = json.dumps(self.msg)
 
