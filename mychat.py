@@ -134,6 +134,14 @@ class BluezChatGui:
         text = self.input_tb.get_text()
 
         if len(text) == 0: return
+        self.add_text("\nme - %s" % text)
+
+        try:
+            text = self.encrypt_for_address(text, self.msg['DST'])
+            self.msg.update({'Flag': '4'}) 
+        except:
+            print "DEBUG: No public key for address, sending unencrypted"
+            self.msg.update({'Flag': '1'}) 
 
         self.msg.update({'msg': text})
         serialized_text = json.dumps(self.msg)
@@ -142,7 +150,7 @@ class BluezChatGui:
             sock.send(serialized_text)
 
         self.input_tb.set_text("")
-        self.add_text("\nme - %s" % text)
+        
 
 
     ## gets info from app screen and sets that info to corresponding fields in msg dictionary.
@@ -155,10 +163,6 @@ class BluezChatGui:
             name = model.get_value(iter, 1)
             self.msg = {'SRC': self.localaddr, 'DST': addr, 'Flag': '1', 'Checksum': '10', 'hops_remaining': 10, 'hop_list': []}
 
-
-
-
-
     def add_button_clicked(self, widget):
         (model, iter) = self.devices_tv.get_selection().get_selected()
         if iter is not None:
@@ -168,6 +172,18 @@ class BluezChatGui:
             self.add_text("\nPairing with %s..." % name)
             self.connect(addr, name)
             self.add_text("\nAdded %s to friend list.\n" % name)
+            self.send_rsa_key(addr, '2')
+
+    def send_rsa_key(self, addr, flag):
+        self.msg = {'SRC': self.localaddr, 
+                    'DST': addr, 
+                    'Flag': flag, 
+                    'msg' : rsa.PublicKey.save_pkcs1(self.pubkey, 'PEM'),
+                    'Checksum': '10', 
+                    'hops_remaining': 10, 
+                    'hop_list': []}
+        serialized_text = json.dumps(self.msg)
+        self.peers[addr].send(serialized_text)
 
     
     def friends_button_clicked(self, widget):
@@ -218,12 +234,21 @@ class BluezChatGui:
         ## If so, print to screen, else decrement remaining hops, scan, and send out to all discovered devices  
         else:
             decoded = json.loads(data)
+            print "DEBUG: message received: "
+            print decoded
             if decoded['DST'] == self.localaddr:
-		self.add_text("\nReceived message destined for me")
-                self.add_text("\n%s - %s" % (str(decoded['SRC']), str(decoded['msg'])))
+                if(decoded['Flag'] == '2' or decoded['Flag'] == '3'): 
+                    self.add_text("\nReceived friend request, exchanging keys")
+                    self.write_public_key(str(decoded['SRC'], str(decoded['msg'])))
+                    if(decoded['Flag'] == '2'):
+                        self.send_rsa_key(decoded['SRC'], '3')
+                else:
+                    self.add_text("\nReceived message destined for me")
+                    self.add_text("\n%s - %s" % (str(decoded['SRC']), 
+                                                 str(self.decrypt_content(decoded['msg']) if decoded['Flag'] == '4' else decoded['msg'])))
             elif decoded['hops_remaining'] > 0:
-                print "Hops left on msg with DST:\n", decoded['hops_remaining']
-		self.add_text("\nPassing along message for %s" % (str(decoded['DST'])))
+                print "DEBUG: Hops left on msg with DST:\n", decoded['hops_remaining']
+                self.add_text("\nPassing along message for %s" % (str(decoded['DST'])))
                 decoded['hops_remaining'] -=1;
                 self.scan_button_clicked(0)
                 self.peers.clear()
@@ -262,7 +287,6 @@ class BluezChatGui:
 
     def start_server(self):
         ## newname should reflect local bluetooth name + 'bluetalk'
-
         namereturn = subprocess.check_output(["sudo", "hciconfig", "hci0", "name"])
         matchobj = re.search('((.{2}:){5}.{2})', namereturn)
         matcher = re.search("Name: '(.{2,48})'", namereturn)
@@ -290,13 +314,15 @@ class BluezChatGui:
     #takes public key in pem format, may change this in the future
     def write_public_key(self, address, pemkey):
         if os.path.exists('keys/' + address + '.pem'):
-            print "\nWarning: Overwriting previous public key for address " + address
+            #print "\nWarning: Overwriting previous public key for address " + address
+            return False
         keyfile = open('keys/' + address + ".pem", 'wb')
         keyfile.write(pemkey)
         keyfile.close()
+        return True
 
     def init_rsa(self):
-	self.add_text("\nloading RSA keypair...")
+        self.add_text("\nloading RSA keypair...")
         if os.path.exists('keys/private.pem'):
             keyfile = open('keys/private.pem')
             keypair = keyfile.read()
