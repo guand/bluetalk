@@ -156,6 +156,8 @@ class BluezChatGui:
 
         #for addr, sock in list(self.peers.items()):
         for addr in self.msg['hop_list']:
+            if(addr == self.localaddr):
+                continue
             self.peers[addr].send(serialized_text)
             #sock.send(serialized_text)
 
