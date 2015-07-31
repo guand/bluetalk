@@ -125,7 +125,8 @@ class BluezChatGui:
         
         ## when send is clicked, Scans for devices, connects to them, and adds input text to msg dict. 
         ## serializes the msg and then sends it over the socket.
-    def send_button_clicked(self, widget):
+
+    def scan_check(self):
         temp_data = []
         self.discovered.clear()
         with open(list_values) as f:
@@ -138,6 +139,8 @@ class BluezChatGui:
         for addr, name in self.discovered:
             self.connect(addr, name)
 
+    def send_button_clicked(self, widget):
+        self.scan_check()
  
         ## do RSA stuff (obviously not implemented)
         text = self.input_tb.get_text()
@@ -270,7 +273,7 @@ class BluezChatGui:
                 print "DEBUG: Hops left on msg with DST:\n", decoded['hops_remaining']
                 self.add_text("\nPassing along message for %s" % (str(decoded['DST'])))
                 decoded['hops_remaining'] -=1;
-                self.scan_button_clicked(0)
+                self.scan_check()
                 self.peers.clear()
                 new_recipients = []
                 for addr, name in self.discovered:
