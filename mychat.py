@@ -146,11 +146,13 @@ class BluezChatGui:
 
         self.msg.update({'msg': text})
         
+        #add our address and new recipients to the hop list
         new_recipients = []
         for addr, sock in list(self.peers.items()):
             if addr not in self.msg['hop_list']:
                 new_recipients.push(addr)
-
+        if self.localaddr not in self.msg['hop_list']:
+            self.msg['hop_list'].push(self.localaddr)
         self.msg['hop_list'] += new_recipients
         serialized_text = json.dumps(self.msg)
 
@@ -248,7 +250,7 @@ class BluezChatGui:
             print decoded
             if decoded['DST'] == self.localaddr:
                 if(decoded['Flag'] == '2' or decoded['Flag'] == '3'): 
-                    self.add_text("\nReceived friend request, exchanging keys")
+                    self.add_text("\nExchanging public keys...")
                     self.write_public_key(decoded['SRC'], decoded['msg'])
                     if(decoded['Flag'] == '2'):
                         self.send_rsa_key(decoded['SRC'], '3')
