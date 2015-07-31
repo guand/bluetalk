@@ -14,6 +14,7 @@ import sys
 import time
 import re
 import rsa
+import base64
 import pickle
 import gtk
 import json
@@ -137,13 +138,14 @@ class BluezChatGui:
         self.add_text("\nme - %s" % text)
 
         try:
-            text = self.encrypt_for_address(text, self.msg['DST'])
+            text = self.encrypt_for_addr(text, self.msg['DST'])
             self.msg.update({'Flag': '4'}) 
         except:
             print "DEBUG: No public key for address, sending unencrypted"
             self.msg.update({'Flag': '1'}) 
 
         self.msg.update({'msg': text})
+        print self.msg
         serialized_text = json.dumps(self.msg)
 
         for addr, sock in list(self.peers.items()):
@@ -208,7 +210,7 @@ class BluezChatGui:
         self.add_text("\naccepted connection from %s" % str(address))
 
         # add new connection to list of peers
-        # self.peers[address] = sock
+        self.peers[address] = sock
         self.addresses[sock] = address
 
         source = gobject.io_add_watch (sock, gobject.IO_IN, self.data_ready)
@@ -343,10 +345,10 @@ class BluezChatGui:
 
     def encrypt_for_addr(self, content, address):
         pkey = self.read_public_key(address)
-        return rsa.encrypt(content, pkey)
+        return base64.encodestring(rsa.encrypt(content, pkey))
 
     def decrypt_content(self, content):
-        return rsa.decrypt(content, self.privkey)
+        return base64.decodestring(rsa.decrypt(content, self.privkey))
 
     def run(self):
         self.text_buffer.insert(self.text_buffer.get_end_iter(), "loading...")
