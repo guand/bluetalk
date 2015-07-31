@@ -348,7 +348,7 @@ class BluezChatGui:
         return base64.encodestring(rsa.encrypt(content, pkey))
 
     def decrypt_content(self, content):
-        return base64.decodestring(rsa.decrypt(content, self.privkey))
+        return rsa.decrypt(base64.decodestring(content), self.privkey))
 
     def run(self):
         self.text_buffer.insert(self.text_buffer.get_end_iter(), "loading...")
