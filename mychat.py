@@ -25,6 +25,8 @@ import subprocess
 import bluetooth
 
 GLADEFILE="bluezchat.glade"
+list_values="list/list.json"
+global child_pid
 
 # *****************
 
@@ -117,7 +119,6 @@ class BluezChatGui:
         for addr, name in bluetooth.discover_devices (duration = 5, lookup_names = True):
             self.discovered.append ((addr, name))
 
-
         self.quit_button.set_sensitive(True)
         self.scan_button.set_sensitive(True)
         self.chat_button.set_sensitive(False)
@@ -125,7 +126,14 @@ class BluezChatGui:
         ## when send is clicked, Scans for devices, connects to them, and adds input text to msg dict. 
         ## serializes the msg and then sends it over the socket.
     def send_button_clicked(self, widget):
-        self.scan_button_clicked(widget)
+        temp_data = []
+        self.discovered.clear()
+        with open(list_values) as f:
+            for line in f:
+                temp_data = json.loads(line)
+        if temp_data:
+            for i,j in temp_data:
+                self.discovered.append ((i, j))
         self.peers.clear()
         for addr, name in self.discovered:
             self.connect(addr, name)
@@ -372,5 +380,6 @@ class BluezChatGui:
         gtk.main()
 
 if __name__ == "__main__":
+    proc = subprocess.Popen(['nohup', 'python','scan_background.py'])
     gui = BluezChatGui()
     gui.run()
