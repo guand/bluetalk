@@ -10,6 +10,7 @@ sessions with them.
 
 
 import os
+import signal
 import sys
 import time
 import re
@@ -26,7 +27,6 @@ import bluetooth
 
 GLADEFILE="bluezchat.glade"
 list_values="list/list.json"
-global child_pid
 
 # *****************
 
@@ -381,5 +381,11 @@ class BluezChatGui:
 
 if __name__ == "__main__":
     proc = subprocess.Popen(['nohup', 'python','scan_background.py'])
+    global child_pid
+    child_pid = proc.pid
     gui = BluezChatGui()
     gui.run()
+    if child_pid is None:
+        pass
+    else:
+        os.kill(child_pid, signal.SIGTERM)
