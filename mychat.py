@@ -136,7 +136,7 @@ class BluezChatGui:
 
         if len(text) == 0: return
         self.add_text("\nme - %s" % text)
-
+        print self.msg['hop_list']
         try:
             text = self.encrypt_for_addr(text, self.msg['DST'])
             self.msg.update({'Flag': '4'}) 
@@ -149,15 +149,13 @@ class BluezChatGui:
         #add our address and new recipients to the hop list
         new_recipients = []
         for addr, sock in list(self.peers.items()):
-            if addr not in self.msg['hop_list']:
-                new_recipients.append(addr)
-        if self.localaddr not in self.msg['hop_list']:
-            self.msg['hop_list'].append(self.localaddr)
-        self.msg['hop_list'] += new_recipients
+            self.msg['hop_list'].append(addr)
+
+        self.msg['hop_list'].append(self.localaddr)
         serialized_text = json.dumps(self.msg)
 
         #for addr, sock in list(self.peers.items()):
-        for addr in new_recipients:
+        for addr in self.msg['hop_list']:
             self.peers[addr].send(serialized_text)
             #sock.send(serialized_text)
 
@@ -264,12 +262,17 @@ class BluezChatGui:
                 decoded['hops_remaining'] -=1;
                 self.scan_button_clicked(0)
                 self.peers.clear()
-                re_serialized = json.dumps(decoded)
+                new_recipients = []
                 for addr, name in self.discovered:
                     if addr not in decoded['hop_list']:
+                        new_recipients.append(addr)
                         self.connect(addr, name)
-                        for addr, sock in list(self.peers.items()):
-                            sock.send(re_serialized)
+                        #for addr, sock in list(self.peers.items()):
+                        #    sock.send(re_serialized)
+                decoded['hop_list'] += new_recipients
+                re_serialized = json.dumps(decoded)
+                for addr in new_recipients:
+                    self.peers[addr].send(re_serialized)
 
                 return True
 
