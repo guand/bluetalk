@@ -21,7 +21,7 @@ import json
 import gobject
 import gtk.glade
 import subprocess
-
+import time
 import bluetooth
 
 GLADEFILE="bluezchat.glade"
@@ -42,6 +42,7 @@ class header:
             self.checksum = checksum
             self.hops_remaining = hops_remaining
             self.hop_list = hop_list
+
 
 class BluezChatGui:
     def __init__(self):
@@ -97,6 +98,7 @@ class BluezChatGui:
         # the listening sockets
         self.server_sock = None
 
+
 # --- gui signal handlers
 
     def quit_button_clicked(self, widget):
@@ -116,6 +118,13 @@ class BluezChatGui:
         self.discovered.clear()
         for addr, name in bluetooth.discover_devices (duration = 5, lookup_names = True):
             self.discovered.append ((addr, name))
+
+        tmp_data = []
+        with open('list/list.json') as f:
+            for line in f:
+                tmp_data.append(json.loads(line))
+        for i, j in tmp_data:
+            print len(i)
 
 
         self.quit_button.set_sensitive(True)
@@ -372,5 +381,7 @@ class BluezChatGui:
         gtk.main()
 
 if __name__ == "__main__":
+    subprocess.Popen(['python','scan_background.py'])
     gui = BluezChatGui()
     gui.run()
+    
